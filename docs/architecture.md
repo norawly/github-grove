@@ -1,19 +1,17 @@
 # Architecture
 
-Grove uses Swift, AppKit, Foundation and ServiceManagement. The source has no package dependencies. Minimum deployment target: macOS 13.
+Swift, AppKit, Foundation, WidgetKit and SwiftUI, without third-party dependencies.
 
-`GroveCore` validates usernames, requests GitHub's public HTML calendar, parses its dated contribution cells, validates contiguous dates and levels, computes UTC streaks, and maps dates to Sunday-first week columns. It accepts both current table markup and older rect markup without relying on attribute order, tooltip contents, or CSS names.
+GroveCore validates usernames, parses GitHub's dated HTML cells, validates calendar continuity, computes UTC streaks, maps the entire year to week columns, defines GitHub colour palettes and snaps desktop-card positions to complete display-local slots.
 
-`CalendarView` draws the card and every cell using AppKit paths and system fonts. One view keeps the drawing tree small. VoiceOver can read individual dates and activity levels. The same view renders the preview PNGs in a bitmap context without creating a window.
+CalendarView is one native drawing view. It renders only the username, streak and calendar. No continuous rendering or mascot timer exists. Tooltip strings remain retained by the live view: passing temporary NSString owners was the cause of the 0.1.0 hover crash. The same view renders preview PNGs without showing windows.
 
-`AppController` owns one non-key, borderless desktop window. Its level is one above the desktop-icon level and below the normal-window level. The widget is stationary, joins desktop Spaces, and is excluded from window cycling. These flags require desktop testing with Stage Manager and Show Desktop on supported macOS versions; compilation does not prove those interactions.
+AppController owns a non-key, borderless window above the wallpaper/desktop-icon layer and below ordinary windows. It joins desktop Spaces and is excluded from window cycling. Drag release snaps to slots anchored at the visible display's top left. An AppKit animation context moves the window in 0.25 seconds using ease-out; Reduce Motion disables the transition. Position is saved after the transition ends.
 
-`SettingsController` owns a normal native settings window. First launch shows setup. Subsequent launches reopen settings. `LSUIElement` and the accessory activation policy omit Dock and menu-bar icons. Start at login is explicitly opted into via `SMAppService.mainApp`.
+SettingsController handles username, appearance, size, card visibility, snapping, locking and optional macOS login startup. LSUIElement and the accessory activation policy omit Dock and menu-bar icons.
 
-The refresh timer runs hourly with ten minutes' scheduling tolerance. Waking only triggers a request if the snapshot is missing or older than an hour. Requests are also limited to once per minute. Fetches use a 30-second request timeout and 45-second resource timeout. One fetch is in flight at a time. Changing username cancels the old request and clears the old cache; cancelled responses cannot overwrite another user's calendar.
+The desktop card refreshes hourly with scheduling tolerance, requests after wake only when data is old, and limits manual refresh to once per minute. A changed username cancels the old fetch and clears its cache. JSON data is written atomically with owner-only permissions. Saved-data timestamps and errors are available through tooltips rather than persistent calendar labels.
 
-The optional animation timer runs at 1.5 seconds per frame with scheduling tolerance. It is removed while the widget is occluded, while screens sleep, or when Reduce Motion or Low Power Mode is enabled. Changes to the power and accessibility state are observed. The default is no animation. No web view, embedded browser, server, login helper executable or notification service is used.
+GroveWidget is a separate sandboxed WidgetKit extension with an hourly timeline, the same public graph client, a private offline cache and scoped read-only access to Grove's settings folder. This component is compiled separately and must be signed with an Apple-issued identity before native-gallery operation can be validated. The ad-hoc gallery rejection observed on the development Mac is documented in native-widget.md.
 
-Local JSON files are written atomically, with owner-only file permissions. On reading the cache, dates, levels, username and continuity are validated again. Public source and installers never include a cached personal calendar or user settings.
-
-The universal build links a static core separately for arm64 and x86_64, merges the executables with lipo, strips debug symbols, bundles the icon and Info.plist, and applies an ad-hoc signature. GitHub Actions repeats the tests and build on macOS. Developer ID signing and notarization require the distributor's Apple credentials and are not part of the community preview.
+Universal app builds compile arm64 and x86_64, merge with lipo, strip debug symbols and bundle the icon/Info.plist. The normal community package excludes the native extension. INCLUDE_WIDGET=1 embeds it before final packaging, signing the extension before the containing app. Signing credentials and local diagnostics are never included in source or installers.

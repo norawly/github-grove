@@ -3,11 +3,11 @@ import GroveCore
 
 enum Rendering {
     /// Renders the actual widget view to a file without creating a window or running NSApplication.
-    static func card(output: String, theme: Theme, snapshot: ContributionSnapshot?, companion: Bool = true) throws {
+    static func card(output: String, theme: Theme, snapshot: ContributionSnapshot?) throws {
         let size = CalendarView.cardSize
         let view = CalendarView(frame: NSRect(origin: .zero, size: size))
         var preferences = Preferences()
-        preferences.theme = theme; preferences.companion = companion
+        preferences.theme = theme
         view.preferences = preferences; view.snapshot = snapshot
         if let snapshot {
             let format = DateFormatter(); format.dateFormat = "MMM d, yyyy"; format.timeZone = GitHubDate.calendar.timeZone
@@ -20,9 +20,9 @@ enum Rendering {
         try bitmap(output: output, size: NSSize(width: 1024, height: 1024), scale: 1) {
             let p = Palette.dark
             let shell = NSBezierPath(roundedRect: NSRect(x: 60, y: 60, width: 904, height: 904), xRadius: 204, yRadius: 204)
-            let gradient = NSGradient(starting: Palette.color(0x243E2B), ending: Palette.color(0x121D16))!
+            let gradient = NSGradient(starting: Palette.color(0x161B22), ending: Palette.color(0x0D1117))!
             gradient.draw(in: shell, angle: 90)
-            Palette.color(0x597C53, alpha: 0.5).setStroke(); shell.lineWidth = 3; shell.stroke()
+            Palette.color(0x30363D, alpha: 0.5).setStroke(); shell.lineWidth = 3; shell.stroke()
             let levels = [[0,1,2,0,0,0,0], [1,2,3,1,0,0,0], [2,3,4,2,1,0,0], [1,2,3,4,2,1,0],
                           [0,1,2,3,4,2,1], [0,0,1,2,3,4,2], [0,0,0,1,2,3,4]]
             for x in 0..<7 { for y in 0..<7 {

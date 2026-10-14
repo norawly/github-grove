@@ -8,7 +8,8 @@ final class SettingsController: NSObject, NSWindowDelegate {
     private let username = NSTextField(string: "")
     private let theme = NSPopUpButton()
     private let size = NSPopUpButton()
-    private let companion = NSButton(checkboxWithTitle: "Slow pixel companion", target: nil, action: nil)
+    private let snapping = NSButton(checkboxWithTitle: "Snap to desktop grid", target: nil, action: nil)
+    private let desktopCard = NSButton(checkboxWithTitle: "Show desktop card", target: nil, action: nil)
     private let lock = NSButton(checkboxWithTitle: "Lock widget position", target: nil, action: nil)
     private let launch = NSButton(checkboxWithTitle: "Start Grove when I log in", target: nil, action: nil)
     private let error = NSTextField(wrappingLabelWithString: "")
@@ -40,7 +41,8 @@ final class SettingsController: NSObject, NSWindowDelegate {
         username.stringValue = preferences.username
         theme.selectItem(at: Theme.allCases.firstIndex(of: preferences.theme) ?? 0)
         size.selectItem(at: [0.8, 1, 1.2, 1.4].firstIndex(of: preferences.scale) ?? 1)
-        companion.state = preferences.companion ? .on : .off
+        snapping.state = preferences.snapping != false ? .on : .off
+        desktopCard.state = preferences.desktopCard != false ? .on : .off
         lock.state = preferences.locked ? .on : .off
         launch.state = SMAppService.mainApp.status == .enabled ? .on : .off
         error.stringValue = ""
@@ -48,7 +50,7 @@ final class SettingsController: NSObject, NSWindowDelegate {
 
     private func buildForm() {
         guard let content = window.contentView else { return }
-        let title = NSTextField(labelWithString: "A little space for your green squares.")
+        let title = NSTextField(labelWithString: "GitHub on your desktop.")
         title.font = .systemFont(ofSize: 18, weight: .semibold)
         let description = NSTextField(wrappingLabelWithString: "Your complete GitHub calendar, quietly on your desktop. Enter a username. No sign-in or token needed.")
         description.font = .systemFont(ofSize: 12); description.textColor = .secondaryLabelColor
@@ -57,7 +59,7 @@ final class SettingsController: NSObject, NSWindowDelegate {
         username.setAccessibilityLabel("GitHub username")
         theme.addItems(withTitles: Theme.allCases.map(\.title))
         size.addItems(withTitles: ["80% · Compact", "100% · Default", "120% · Large", "140% · Extra large"])
-        companion.toolTip = "One frame every 1.5 seconds. Pauses when hidden, asleep, in Low Power Mode, or Reduce Motion is on."
+        snapping.toolTip = "On release, the desktop card moves to the nearest widget slot."
         launch.toolTip = "macOS may ask you to allow Grove in Login Items."
         let hint = NSTextField(wrappingLabelWithString: "Drag the card to move it. Right-click for options, or open Grove again for settings. Updates hourly; the last calendar is kept offline.")
         hint.font = .systemFont(ofSize: 11); hint.textColor = .secondaryLabelColor
@@ -68,7 +70,7 @@ final class SettingsController: NSObject, NSWindowDelegate {
         quit.bezelStyle = .rounded
         let buttons = NSStackView(views: [quit, NSView(), save]); buttons.distribution = .fill
         let stack = NSStackView(views: [title, description, row("Username", username), row("Appearance", theme),
-                                      row("Size", size), companion, lock, launch, hint, error, buttons])
+                                      row("Size", size), desktopCard, snapping, lock, launch, hint, error, buttons])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(stack)
@@ -98,7 +100,8 @@ final class SettingsController: NSObject, NSWindowDelegate {
         preferences.username = name
         preferences.theme = Theme.allCases[max(0, theme.indexOfSelectedItem)]
         preferences.scale = [0.8, 1, 1.2, 1.4][max(0, size.indexOfSelectedItem)]
-        preferences.companion = companion.state == .on
+        preferences.snapping = snapping.state == .on
+        preferences.desktopCard = desktopCard.state == .on
         preferences.locked = lock.state == .on
         let requestedLaunch = launch.state == .on
         do {

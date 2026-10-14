@@ -1,34 +1,29 @@
 # Verification status
 
-This preview was prepared without installing, launching a desktop window, registering a login item, or changing the development machine's settings.
+## Automated
 
-## Automated checks
+13 check groups pass: username validation; unordered table/SVG parsing; quote variants; error pages; missing/duplicate/invalid dates and levels; UTC leap days; today/yesterday streaks and lower bounds; full-year layout including a 54th column; cache round trips; grid anchoring/idempotence; and bounds on smaller or secondary displays.
 
-The dependency-free test runner checks real behavior: username validation; calendar parsing independent of attribute order and row order; single and double quotes; table and SVG cells; failure on error pages; missing, duplicated or malformed dates; invalid activity levels; UTC leap days; today/yesterday streak behavior; streak gaps and lower bounds; full Sunday-first layout; retaining a 54th week when necessary; and cache round trips and validation.
+Universal desktop-card and WidgetKit-extension compilation, ad-hoc signature verification and native AppKit PNG rendering pass locally. Native PluginKit registration passed, but the macOS 27 widget-gallery descriptor check rejected the ad-hoc extension. See native-widget.md.
 
-Locally verified on 14 October 2026:
+GitHub Actions separately repeats the source scan, checks, installer build and optional native-extension compilation.
 
-- All 11 check groups pass with zero failures.
-- The real public GitHub calendar is fetched through the app's URLSession client and parses as 368 contiguous dates ending on 14 October 2026.
-- The native AppKit view renders correctly offscreen in light and dark appearances; public screenshots use explicitly fictional demo data.
-- Release compilation for arm64 and x86_64, merged into one universal app with a macOS 13 deployment target.
-- The application bundle's ad-hoc signature and Info.plist validate.
-- DMG integrity, ZIP contents and SHA-256 checksums validate.
-- Source and release executable scans contain no personal filesystem paths or credentials. Local previews and build outputs are excluded from Git.
+## Desktop session, 14 October 2026
 
-GitHub Actions repeats the source scan, checks and universal build. Its status is independent of the local verification above.
+- Installed Grove in Applications; entered the GitHub username and loaded the real public calendar.
+- Reproduced a 0.1.0 crash on hover, identified the tooltip-owner lifetime error from its stack, and changed tooltip ownership to the retained view.
+- Installed the compact 0.2.0 design and inspected the actual window using macOS accessibility and screenshots.
+- Confirmed initial top-left position and saved preferences.
+- The user manually confirmed that drag release snaps to the grid, then requested a smoother transition. The final implementation adds a 0.25-second AppKit ease-out transition, without a spring.
+- During an idle sample of the compact version, the process used approximately 40 MB resident memory and reported 0.0% CPU. This is a sample, not a battery benchmark.
 
-## Desktop session still required
+## Remaining checks
 
-- Fresh first launch, username save, refresh, error and offline recovery.
-- No Dock/menu-bar icon, settings reopen, right-click menu, double-click, drag and lock.
-- Placement on wallpaper below ordinary windows; Spaces, Show Desktop, fullscreen and Stage Manager.
-- Light/dark switching, scaling, multiple displays and display disconnect/reconnect.
-- Login-item registration, approval in System Settings, and successful launch after login.
-- Sleep/wake, occlusion and Reduce Motion behavior.
-- CPU, memory and energy use on a real idle desktop.
-- VoiceOver date navigation and settings controls.
-- Installation and runtime on Intel and macOS 13. Cross-compilation alone is not real-device proof.
-- Gatekeeper behavior of the downloaded, ad-hoc signed community build.
+- User confirmation of the final smoother snap transition.
+- Login registration and successful launch after a real login.
+- Sleep/wake, display reconnect, Stage Manager and fullscreen interactions.
+- Battery measurements over a longer session.
+- Runtime on Intel and macOS 13; cross-compilation alone does not prove those platforms.
+- Native-widget gallery, configuration and timeline behavior after an Apple-issued signature is available.
 
-Desktop testing was deliberately deferred so the user's active work would not be interrupted. These points must not be described as already runtime-verified.
+The UI automation tool can inspect the desktop-level card, but cannot route pointer actions to its non-key desktop window; direct drag/hover confirmation comes from the user. Automated tests are distinguished from those manual checks.

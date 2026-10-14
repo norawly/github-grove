@@ -1,6 +1,8 @@
 import AppKit
 import CoreGraphics
 import ServiceManagement
+import WidgetKit
+import QuartzCore
 import GroveCore
 
 final class DesktopWindow: NSWindow {
@@ -16,12 +18,12 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var desktop: DesktopWindow?
     private var settings: SettingsController?
     private var refreshTimer: Timer?
-    private var animationTimer: Timer?
     private var request: Task<Void, Never>?
     private var sleeping = false
     private var observers: [NSObjectProtocol] = []
     private var workspaceObservers: [NSObjectProtocol] = []
     private var lastAttempt = Date.distantPast
+    private var animatingSnap = false
 
     override init() {
         preferences = store.loadPreferences()
@@ -52,11 +54,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         restorePosition()
         calendarView.settingsAction = { [weak self] in self?.showSettings() }
         calendarView.menuAction = { [weak self] in self?.makeMenu() ?? NSMenu() }
-        calendarView.positionChanged = { [weak self] in self?.savePosition() }
-        window.orderFrontRegardless()
+        calendarView.positionChanged = { [weak self] in self?.snapPosition() }
+        if preferences.desktopCard != false { window.orderFrontRegardless() }
         installObservers()
         startRefreshTimer()
-        updateAnimation()
         if preferences.username.isEmpty { showSettings() } else { refreshIfNeeded() }
     }
 
@@ -67,7 +68,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     func applicationWillTerminate(_ notification: Notification) {
-        request?.cancel(); refreshTimer?.invalidate(); animationTimer?.invalidate()
+        request?.cancel(); refreshTimer?.invalidate()
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         workspaceObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         savePosition()
@@ -79,25 +80,17 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func installObservers() {
         let center = NotificationCenter.default
-        for name in [NSApplication.didChangeScreenParametersNotification, NSWindow.didChangeOcclusionStateNotification,
-                     Notification.Name.NSProcessInfoPowerStateDidChange] {
-            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    if name == NSApplication.didChangeScreenParametersNotification { self?.restorePosition() }
-                    self?.updateAnimation()
-                }
+        observers.append(center.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.restorePosition(); self?.snapPosition() }
             })
-        }
-        // Accessibility notifications are also delivered by the workspace notification center.
         let workspace = NSWorkspace.shared.notificationCenter
-        workspaceObservers.append(workspace.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
-            object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.updateAnimation() } })
         for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification] {
             workspaceObservers.append(workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     self.sleeping = true; self.request?.cancel(); self.request = nil
-                    self.calendarView.busy = false; self.refreshTimer?.invalidate(); self.updateAnimation()
+                    self.calendarView.busy = false; self.refreshTimer?.invalidate()
                 }
             })
         }
@@ -105,7 +98,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
             workspaceObservers.append(workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self else { return }
-                    self.sleeping = false; self.startRefreshTimer(); self.refreshIfNeeded(); self.updateAnimation()
+                    self.sleeping = false; self.startRefreshTimer(); self.refreshIfNeeded()
                 }
             })
         }
@@ -139,6 +132,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 let snapshot = try await ContributionClient().fetch(username: username)
                 guard !Task.isCancelled, let self, self.preferences.username == username else { return }
                 self.store.save(snapshot)
+                self.reloadNativeWidget()
                 self.calendarView.snapshot = snapshot
                 self.calendarView.offline = false
                 self.calendarView.busy = false
@@ -161,18 +155,32 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         calendarView.status = "Updated \(formatter.string(from: snapshot.fetchedAt))"
     }
 
-    private func updateAnimation() {
-        animationTimer?.invalidate(); animationTimer = nil
-        guard preferences.companion, !sleeping,
-              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
-              !ProcessInfo.processInfo.isLowPowerModeEnabled,
-              desktop?.occlusionState.contains(.visible) == true else { return }
-        let timer = Timer(timeInterval: 1.5, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.calendarView.companionFrame += 1 }
+    private func snapPosition() {
+        guard let desktop, let screen = desktop.screen ?? currentScreen() else { return }
+        if preferences.snapping != false {
+            let area = screen.visibleFrame
+            let point = DesktopGrid.snap(x: desktop.frame.minX, y: desktop.frame.minY,
+                widgetWidth: widgetSize.width, widgetHeight: widgetSize.height,
+                screenX: area.minX, screenY: area.minY, screenWidth: area.width, screenHeight: area.height)
+            let target = NSPoint(x: point.x, y: point.y)
+            if target != desktop.frame.origin && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                animatingSnap = true
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.25
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    desktop.animator().setFrame(NSRect(origin: target, size: desktop.frame.size), display: true)
+                } completionHandler: { [weak self] in
+                    Task { @MainActor [weak self] in
+                        self?.animatingSnap = false
+                        self?.calendarView.updateAccessibilityCells()
+                        self?.savePosition()
+                    }
+                }
+                return
+            }
+            desktop.setFrameOrigin(target)
         }
-        timer.tolerance = 0.3
-        RunLoop.main.add(timer, forMode: .common)
-        animationTimer = timer
+        savePosition()
     }
 
     private func currentScreen() -> NSScreen? {
@@ -216,6 +224,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let scaleChanged = updated.scale != preferences.scale
         preferences = updated
         calendarView.preferences = preferences
+        if preferences.desktopCard == false { desktop?.orderOut(nil) }
+        else { desktop?.orderFrontRegardless() }
         if usernameChanged {
             request?.cancel(); request = nil; lastAttempt = .distantPast
             calendarView.busy = false; calendarView.offline = false; calendarView.status = ""
@@ -223,10 +233,19 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
             refresh()
         }
         if scaleChanged { restorePosition() }
-        savePosition(); updateAnimation()
+        savePosition()
+        reloadNativeWidget()
     }
 
-    func windowDidMove(_ notification: Notification) { calendarView.updateAccessibilityCells() }
+    private func reloadNativeWidget() {
+        guard let plugins = Bundle.main.builtInPlugInsURL,
+              FileManager.default.fileExists(atPath: plugins.appendingPathComponent("GroveWidget.appex").path) else { return }
+        WidgetCenter.shared.reloadTimelines(ofKind: "GroveContributionCalendar")
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        if !animatingSnap { calendarView.updateAccessibilityCells() }
+    }
 
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
@@ -249,7 +268,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let size = NSMenuItem(title: "Size", action: nil, keyEquivalent: ""); size.submenu = sizes; menu.addItem(size)
         let lock = item("Lock position", action: #selector(lockClicked)); lock.state = preferences.locked ? .on : .off; menu.addItem(lock)
         menu.addItem(item("Move to top left", action: #selector(resetPosition)))
-        let companion = item("Pixel companion", action: #selector(companionClicked)); companion.state = preferences.companion ? .on : .off; menu.addItem(companion)
+        let snap = item("Snap to desktop grid", action: #selector(snapClicked))
+        snap.state = preferences.snapping != false ? .on : .off; menu.addItem(snap)
         menu.addItem(.separator())
         let profile = item("Open GitHub profile", action: #selector(openProfile)); profile.isEnabled = !preferences.username.isEmpty; menu.addItem(profile)
         menu.addItem(item("Quit Grove", action: #selector(quit)))
@@ -264,7 +284,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func themeClicked(_ item: NSMenuItem) { var updated = preferences; updated.theme = Theme.allCases[item.tag]; apply(updated) }
     @objc private func scaleClicked(_ item: NSMenuItem) { var updated = preferences; updated.scale = [0.8, 1, 1.2, 1.4][item.tag]; apply(updated) }
     @objc private func lockClicked() { var updated = preferences; updated.locked.toggle(); apply(updated) }
-    @objc private func companionClicked() { var updated = preferences; updated.companion.toggle(); apply(updated) }
+    @objc private func snapClicked() { var updated = preferences; updated.snapping = preferences.snapping == false; apply(updated); snapPosition() }
     @objc private func resetPosition() { restorePosition(reset: true) }
     @objc private func openProfile() { if let url = URL(string: "https://github.com/\(preferences.username)") { NSWorkspace.shared.open(url) } }
     @objc private func quit() { NSApp.terminate(nil) }

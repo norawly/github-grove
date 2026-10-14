@@ -32,12 +32,15 @@ if arguments.first == "--fetch" {
     guard arguments.count >= 2 else { fail("Usage: Grove --render OUTPUT.png [--theme light|dark] [--html FILE --username NAME]") }
     do {
         let snapshot: ContributionSnapshot
-        if let path = option("--html") {
+        if let path = option("--cache") {
+            snapshot = try JSONDecoder().decode(ContributionSnapshot.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+            try snapshot.validate()
+        } else if let path = option("--html") {
             guard let name = option("--username") else { fail("--html requires --username") }
             snapshot = try ContributionParser.parse(String(contentsOfFile: path, encoding: .utf8), username: name)
         } else { snapshot = Rendering.demo() }
         let theme = Theme(rawValue: option("--theme") ?? "dark") ?? .dark
-        try Rendering.card(output: arguments[1], theme: theme, snapshot: snapshot, companion: !arguments.contains("--no-companion"))
+        try Rendering.card(output: arguments[1], theme: theme, snapshot: snapshot)
         print("Rendered \(arguments[1]) without opening a window.")
     } catch { fail(error.localizedDescription) }
 } else if arguments.first == "--icon" {

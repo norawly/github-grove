@@ -102,4 +102,25 @@ final class CalendarTests {
         expectThrows(try ContributionSnapshot(username: "../bad", days: fixture()).validate())
         expectThrows(try ContributionSnapshot(username: "octocat", days: []).validate())
     }
+
+    func testSnappingAnchorsAndIsStable() {
+        let point = DesktopGrid.snap(x: 70, y: 810, widgetWidth: 624, widgetHeight: 126,
+            screenX: 0, screenY: 0, screenWidth: 1512, screenHeight: 982)
+        expectEqual(point.x, 24); expectEqual(point.y, 832)
+        let moved = DesktopGrid.snap(x: 670, y: 520, widgetWidth: 624, widgetHeight: 126,
+            screenX: 0, screenY: 0, screenWidth: 1512, screenHeight: 982)
+        expectEqual(moved.x, 664); expectEqual(moved.y, 548)
+        let repeated = DesktopGrid.snap(x: moved.x, y: moved.y, widgetWidth: 624, widgetHeight: 126,
+            screenX: 0, screenY: 0, screenWidth: 1512, screenHeight: 982)
+        expectEqual(moved, repeated)
+    }
+
+    func testSnappingStaysOnSecondaryAndSmallDisplays() {
+        for (screenX, screenY, width, height) in [(0.0, 0.0, 500.0, 300.0), (-1440.0, -100.0, 1440.0, 900.0)] {
+            let point = DesktopGrid.snap(x: 9000, y: -9000, widgetWidth: 400, widgetHeight: 200,
+                screenX: screenX, screenY: screenY, screenWidth: width, screenHeight: height)
+            expectAtLeast(point.x, screenX); expectAtLeast(point.y, screenY)
+            expectAtLeast(screenX + width, point.x + 400); expectAtLeast(screenY + height, point.y + 200)
+        }
+    }
 }

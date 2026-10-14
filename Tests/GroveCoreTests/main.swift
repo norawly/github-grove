@@ -41,7 +41,9 @@ let checks: [(String, () throws -> Void)] = [
     ("Streak gaps and calendar boundary", suite.testStreakStopsAtGapsAndMarksRollingWindowLimit),
     ("Full calendar layout", suite.testLayoutPreservesEveryDayAndSundayFirstOrientation),
     ("54th column retained", suite.testLayoutRetains54thColumnWhenNecessary),
-    ("Cache validation and round trip", suite.testCacheRoundTripAndInvalidCacheValidation)
+    ("Cache validation and round trip", suite.testCacheRoundTripAndInvalidCacheValidation),
+    ("Widget grid snapping and stability", suite.testSnappingAnchorsAndIsStable),
+    ("Widget grid on secondary and small displays", suite.testSnappingStaysOnSecondaryAndSmallDisplays)
 ]
 for (name, check) in checks {
     let before = failures

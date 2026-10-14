@@ -17,6 +17,11 @@ jobs:
         run: bash scripts/test.sh
       - name: Build universal application and installers
         run: bash scripts/build.sh --package
+      - name: Compile the optional WidgetKit extension
+        run: |
+          mkdir -p build/native-check
+          ditto dist/Grove.app build/native-check/Grove.app
+          bash scripts/build-widget.sh build/native-check/Grove.app
       - name: Render the real native view without opening windows
         run: |
           dist/Grove.app/Contents/MacOS/Grove --render build/preview-dark.png --theme dark

@@ -12,6 +12,10 @@ sdk="$(/usr/bin/xcrun --sdk macosx --show-sdk-path)"
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
 app="dist/Grove.app"
 mkdir -p build dist
+if [[ -d "$app/Contents/PlugIns/GroveWidget.appex" ]]; then
+    mkdir -p build/retired-widgets
+    mv "$app/Contents/PlugIns/GroveWidget.appex" "build/retired-widgets/widget-$(date +%s)-$$.appex"
+fi
 
 for arch in arm64 x86_64; do
     directory="build/$arch"
@@ -34,6 +38,9 @@ else
     /usr/bin/codesign --force --sign - "$app"
 fi
 /usr/bin/codesign --verify --strict "$app"
+if [[ "${INCLUDE_WIDGET:-0}" == "1" ]]; then
+    bash scripts/build-widget.sh "$app"
+fi
 /usr/bin/lipo -archs "$app/Contents/MacOS/Grove"
 printf 'Built %s (macOS 13+, Apple Silicon + Intel).\n' "$app"
 

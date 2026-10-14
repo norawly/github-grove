@@ -11,7 +11,8 @@ struct Preferences: Codable {
     var theme: Theme = .system
     var scale: Double = 1
     var locked = false
-    var companion = false
+    var snapping: Bool? = true
+    var desktopCard: Bool? = true
     var originX: Double?
     var originY: Double?
     var screenID: UInt32?
