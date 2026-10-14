@@ -1,0 +1,25 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/privacy-check.py
+      - name: Verify tag matches app version
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
+          test "$GITHUB_REF_NAME" = "v$version"
+      - run: bash scripts/test.sh
+      - run: bash scripts/build.sh --package
+      - name: Publish downloadable community build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.dmg dist/SHA256SUMS.txt --verify-tag --prerelease --title "Grove ${GITHUB_REF_NAME#v} · Preview" --notes-file docs/release-notes.md

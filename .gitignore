@@ -1,0 +1,11 @@
+.build/
+build/
+dist/
+.DS_Store
+*.xcuserstate
+.swiftpm/
+.env*
+!*.example
+*.log
+*.dSYM/
+local/

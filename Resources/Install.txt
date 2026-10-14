@@ -1,0 +1,16 @@
+Grove — GitHub on your desktop
+
+1. Drag Grove.app into Applications.
+2. Open Grove from Applications. Enter your GitHub username and click Save.
+3. Drag the desktop card to your preferred corner. Right-click it for settings.
+
+Grove has no Dock icon or menu-bar icon. Open Grove again to access settings.
+Start at login is optional and must be enabled in Grove's settings.
+
+This community build is ad-hoc signed, not Apple-notarized. macOS may block its
+first launch. After attempting to open the app, use System Settings > Privacy
+& Security > Open Anyway, if macOS offers this option. The source is public:
+https://github.com/norawly/github-grove
+
+No separate account, token, or permissions are required. Only the public
+GitHub contribution graph is requested. Offline mode shows the saved graph.
