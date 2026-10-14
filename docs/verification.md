@@ -14,12 +14,11 @@ GitHub Actions separately repeats the source scan, checks, installer build and o
 - Reproduced a 0.1.0 crash on hover, identified the tooltip-owner lifetime error from its stack, and changed tooltip ownership to the retained view.
 - Installed the compact 0.2.0 design and inspected the actual window using macOS accessibility and screenshots.
 - Confirmed initial top-left position and saved preferences.
-- The user manually confirmed that drag release snaps to the grid, then requested a smoother transition. The final implementation adds a 0.25-second AppKit ease-out transition, without a spring.
+- The user manually confirmed grid snapping and then confirmed the final 0.25-second AppKit ease-out transition feels correct. No spring or bounce is used.
 - During an idle sample of the compact version, the process used approximately 40 MB resident memory and reported 0.0% CPU. This is a sample, not a battery benchmark.
 
 ## Remaining checks
 
-- User confirmation of the final smoother snap transition.
 - Login registration and successful launch after a real login.
 - Sleep/wake, display reconnect, Stage Manager and fullscreen interactions.
 - Battery measurements over a longer session.
